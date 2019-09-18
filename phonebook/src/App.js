@@ -15,7 +15,7 @@ const App = () => {
   useEffect(() => {
     console.log('effect')
     personService
-      .getAll('http://localhost:3001/api/persons')
+      .getAll('/api/persons')
       .then(response => {
         console.log('promise fulfilled')
         setPersons(response.data)
