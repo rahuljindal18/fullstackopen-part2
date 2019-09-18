@@ -1,32 +1,21 @@
 import React, { useState, useEffect } from 'react'
-import axios from 'axios'
+import Filter from './Filter'
+import PersonForm from './PersonForm'
 
-const Filter = ({searchText, onSearchChange}) => (
-    <div>filter shown with <input value={searchText} onChange={onSearchChange}/></div>
-)
-
-const PersonForm = ({newName,phone,handleInputChange,handlePhoneChange,onFormSubmit}) => (
-    <form onSubmit={onFormSubmit}>
-        <div>
-          name: <input type="text" value={newName} onChange={handleInputChange}/>
-        </div>
-        <div>number: <input type="text" value={phone} onChange={handlePhoneChange}/></div>
-        <div>
-          <button type="submit">add</button>
-        </div>
-    </form>
-)
+import personService from './service/persons'
+import Notification from './Notification'
 
 const App = () => {
   const [persons, setPersons] = useState([])
   const [ newName, setNewName ] = useState('')
   const [ phone, setPhone ] = useState('')
   const [ searchText, setSearchText ] = useState('')
+  const [notification, setNotification] = useState('')
 
   useEffect(() => {
     console.log('effect')
-    axios
-      .get('http://localhost:3001/persons')
+    personService
+      .getAll('http://localhost:3001/api/persons')
       .then(response => {
         console.log('promise fulfilled')
         setPersons(response.data)
@@ -58,29 +47,77 @@ const App = () => {
   }
   const onFormSubmit = (event) => {
     event.preventDefault()
-    const found = persons.find(person => (person.name === newName || person.name.toLowerCase().includes(newName.toLowerCase())))
+    const found = persons.find(person => (person.name.toLowerCase() === newName.toLowerCase() || person.name.toLowerCase().includes(newName.toLowerCase())))
+    
     if(found === undefined){
         const newObj = {
             name : newName,
             number: phone
         }
-        setPersons([...persons,newObj])
-        setNewName('')
+        personService.createPerson(newObj)
+                .then(response => {
+                  setNotification(`Added ${newObj.name}`)
+                  setTimeout(() => {
+                    setNotification(null)
+                  }, 5000)
+                  setPersons([...persons,response.data])
+                  setNewName('')
+                })
+        
+    }
+    else if(found){
+        const newObj = {...found,number:phone}
+        if(window.confirm(`${found.name} is already added to phonebook, replace the old number with the new one`)){
+          personService.updatePerson(newObj,found.id)
+          .then(response => {
+            setPersons(persons.map( person => person.id !== found.id ? person : response.data))
+          })
+        }
+        
     }
     else{
         alert(`${newName} is already added to phonebook`)
     }
   }
 
+  const deletePerson = (person) => {
+    if (window.confirm(`Delete ${person.name} ?`)) { 
+      const id = person.id
+      personService.personDelete(id)
+        .then(response => {
+          setPersons(persons.filter(person => person.id !== id ))
+      })
+    }
+    
+  }
+
   return (
     <div>
       <h2>Phonebook</h2>
-      <Filter searchText={searchText} onSearchChange={onSearchChange}/>
+      <Notification message={notification}/>
+      <Filter 
+        searchText={searchText} 
+        onSearchChange={onSearchChange}
+      />
       <br/>
       <h3>Add a new </h3>
-      <PersonForm newName={newName} phone={phone} handleInputChange={handleInputChange} handlePhoneChange={handlePhoneChange} onFormSubmit={onFormSubmit}/>
+      <PersonForm 
+        newName={newName} 
+        phone={phone} 
+        handleInputChange={handleInputChange} 
+        handlePhoneChange={handlePhoneChange} 
+        onFormSubmit={onFormSubmit}
+      />
+      <a href="javascript: alert('heloo')"/>
       <h3>Numbers</h3>
-      {persons.map(person => <p key={person.name}>{person.name} : {person.number}</p>)}
+      {
+        persons.map(person => 
+          <div key={person.id}>
+            <p>{person.name} : {person.number}</p>
+            <button onClick={() => deletePerson(person)}>delete</button>
+          </div>
+        )
+      }
     </div>
   )
 }
